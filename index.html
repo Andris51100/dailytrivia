@@ -1,0 +1,249 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Daily Trivia Quiz</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <h1>Daily Trivia Quiz</h1>
+        <div id="quiz"></div>
+        <div id="progress-bar">
+            <div id="progress-bar-inner"></div>
+        </div>
+        <div class="button-container">
+            <button id="prev-btn">Previous Question</button>
+            <button id="next-btn">Next Question</button>
+            <button id="submit-btn">Submit</button>
+        </div>
+        <div id="result"></div>
+    </div>
+
+    <script type="module">
+        // Import the functions you need from the SDKs you need
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-app.js";
+        import { getDatabase, onValue, ref } from "https://www.gstatic.com/firebasejs/10.11.1/firebase-database.js";
+
+        const quizContainer = document.getElementById('quiz');
+        const nextButton = document.getElementById('next-btn');
+        const prevButton = document.getElementById('prev-btn');
+        const submitButton = document.getElementById('submit-btn');
+        const progressBarInner = document.getElementById('progress-bar-inner');
+        const resultContainer = document.getElementById('result');
+
+        let currentQuestionIndex = 0;
+        let selectedAnswers = [];
+        const questions = [
+            {
+                question: "-",
+                options: ["-", "-", "-", "-"],
+                answer: "-"
+            },
+            {
+                question: "-",
+                options: ["-", "-", "-", "-"],
+                answer: "-"
+            },
+            {
+                question: "-",
+                options: ["-", "-", "-", "-"],
+                answer: "-"
+            },
+            {
+                question: "-",
+                options: ["-", "-", "-", "-"],
+                answer: "-"
+            },
+            {
+                question: "-",
+                options: ["-", "-", "-", "-"],
+                answer: "-"
+            }
+        ];
+
+        // Function to load question and options
+        function loadQuestion() {
+            const currentQuestion = questions[currentQuestionIndex];
+            const questionElement = document.createElement('div');
+            questionElement.classList.add('question');
+            questionElement.innerHTML = `
+                <h2>${currentQuestion.question}</h2>
+                <ul class="options">
+                    ${currentQuestion.options.map(option => `
+                        <li onclick="selectOption('${option}')" class="${selectedAnswers[currentQuestionIndex] === option ? 'selected' : ''}">
+                            <input type="radio" name="option" value="${option}" ${selectedAnswers[currentQuestionIndex] === option ? 'checked' : ''}>
+                            <label>${option}</label>
+                        </li>`).join('')}
+                </ul>
+            `;
+            quizContainer.innerHTML = '';
+            quizContainer.appendChild(questionElement);
+
+            // Adjust button display based on current question index
+            if (currentQuestionIndex === 0) {
+                prevButton.style.display = 'none';
+                submitButton.style.display = 'none';
+                nextButton.style.display = 'block';
+                nextButton.style.marginLeft = 'auto'; // Move next button to right
+            } else {
+                prevButton.style.display = 'block';
+                if (currentQuestionIndex != questions.length - 1) {
+                    nextButton.style.display = 'block';
+                    nextButton.style.marginLeft = '0'; // Reset margin for next button
+                }
+            }
+        }
+
+        // Function to update progress bar
+        function updateProgressBar(option = -1) {
+            if (option != -1) {
+                const progress = (option / questions.length) * 100;
+                progressBarInner.style.width = `${progress}%`;
+            } else {
+                const progress = (currentQuestionIndex / questions.length) * 100;
+                progressBarInner.style.width = `${progress}%`;
+            }
+        }
+
+        // Function to select option
+        window.selectOption = function(option) {
+            selectedAnswers[currentQuestionIndex] = option;
+            loadQuestion(); // Reload the question to update selection display
+        }
+
+        // Event listener for next button
+        nextButton.addEventListener('click', function () {
+            if (selectedAnswers[currentQuestionIndex] === null) {
+                alert('Please select an option.');
+                return;
+            }
+
+            currentQuestionIndex++;
+            if (currentQuestionIndex < questions.length) {
+                loadQuestion();
+                updateProgressBar(); // Update progress bar after loading question
+                if (currentQuestionIndex === questions.length - 1) {
+                    nextButton.style.display = 'none';
+                    submitButton.style.display = 'block';
+                } else {
+                    nextButton.style.display = 'block';
+                    nextButton.style.marginLeft = 'auto'; // Keep next button on the right
+                    submitButton.style.display = 'none'; // Hide submit button if not last question
+                }
+                prevButton.style.display = 'block'; // Show previous button when navigating forward
+            }
+        });
+
+        // Event listener for previous button
+        prevButton.addEventListener('click', function () {
+            currentQuestionIndex--;
+            if (currentQuestionIndex >= 0) {
+                loadQuestion();
+                updateProgressBar(); // Update progress bar after loading question
+                nextButton.style.display = 'block';
+                if (currentQuestionIndex > 0) {
+                    nextButton.style.marginLeft = '0'; // Reset margin for next button if not first question
+                } else {
+                    nextButton.style.marginLeft = 'auto'; // Move next button to right if first question
+                }
+                submitButton.style.display = 'none'; // Hide submit button when navigating back
+            }
+        });
+
+        // Event listener for submit button
+        submitButton.addEventListener('click', function () {
+            let score = 0;
+            let wrongAnswers = [];
+            questions.forEach((question, index) => {
+                if (selectedAnswers[index] === question.answer) {
+                    score++;
+                } else {
+                    wrongAnswers.push({ question: question.question, your_answer: selectedAnswers[index], correct_answer: question.answer });
+                }
+            });
+
+            // Display score
+            resultContainer.innerHTML = `<h2>Your Score: ${score}/${questions.length}</h2>`;
+
+            // Display wrong answers
+            if (wrongAnswers.length > 0) {
+                resultContainer.innerHTML += '<h3>Wrong Answers:</h3>';
+                resultContainer.innerHTML += '<div class="wrong-answers">';
+                wrongAnswers.forEach((item, index) => {
+                    resultContainer.innerHTML += `
+                        <div class="wrong-answer">
+                            <p><strong>Question ${index + 1}:</strong> ${item.question}</p>
+                            <p><strong>Your Answer:</strong> ${item.your_answer}</p>
+                            <p><strong>Correct Answer:</strong> ${item.correct_answer}</p>
+                        </div>`;
+                });
+                resultContainer.innerHTML += '</div>';
+            }
+            updateProgressBar(currentQuestionIndex + 1); // Update progress bar after submitting
+        });
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyBsp1-zs0dxKsYpJXCUwQuTW0xCXg9qqOI",
+            authDomain: "trivia-299df.firebaseapp.com",
+            databaseURL: "https://trivia-299df-default-rtdb.europe-west1.firebasedatabase.app",
+            projectId: "trivia-299df",
+            storageBucket: "trivia-299df.appspot.com",
+            messagingSenderId: "845190202359",
+            appId: "1:845190202359:web:0ad740dae4394b650ee4f2",
+            measurementId: "G-LGW12RQ2SF"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase();
+        const fq = ref(db, "first");
+        onValue(fq, (snapshot) => {
+            const value = snapshot.val();
+            questions[0].question = value["question"];
+            questions[0].options = [value["answer1"], value["answer2"], value["answer3"], value["answer4"]];
+            questions[0].answer = value["answerGood"];
+            loadQuestion();
+            updateProgressBar();
+        });
+        const sq = ref(db, "second");
+        onValue(sq, (snapshot) => {
+            const value = snapshot.val();
+            questions[1].question = value["question"];
+            questions[1].options = [value["answer1"], value["answer2"], value["answer3"], value["answer4"]];
+            questions[1].answer = value["answerGood"];
+            loadQuestion();
+            updateProgressBar();
+        });
+        const tq = ref(db, "third");
+        onValue(tq, (snapshot) => {
+            const value = snapshot.val();
+            questions[2].question = value["question"];
+            questions[2].options = [value["answer1"], value["answer2"], value["answer3"], value["answer4"]];
+            questions[2].answer = value["answerGood"];
+            loadQuestion();
+            updateProgressBar();
+        });
+        const fourthq = ref(db, "fourth");
+        onValue(fourthq, (snapshot) => {
+            const value = snapshot.val();
+            questions[3].question = value["question"];
+            questions[3].options = [value["answer1"], value["answer2"], value["answer3"], value["answer4"]];
+            questions[3].answer = value["answerGood"];
+            loadQuestion();
+            updateProgressBar();
+        });
+        const fifthq = ref(db, "fifth");
+        onValue(fifthq, (snapshot) => {
+            const value = snapshot.val();
+            questions[4].question = value["question"];
+            questions[4].options = [value["answer1"], value["answer2"], value["answer3"], value["answer4"]];
+            questions[4].answer = value["answerGood"];
+            loadQuestion();
+            updateProgressBar();
+        });
+    </script>
+</body>
+</html>
